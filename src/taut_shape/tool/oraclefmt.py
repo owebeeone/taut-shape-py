@@ -100,20 +100,18 @@ def _coerce(hint: Any, native: Any) -> Any:
     if native is None:
         return None
     origin = getattr(hint, "__args__", None)
+    list_origin = getattr(hint, "__origin__", None)
+    # list[X] / tuple[X] first — a single type arg here is the element type,
+    # not an Optional member (Optional[list[X]] resolves to the list here too).
+    if list_origin in (list, tuple):
+        (elem,) = [a for a in hint.__args__ if a is not type(None)]  # noqa: E721
+        return [_coerce(elem, v) for v in native]
     # optional/union: pick the non-None member
     if origin is not None:
         members = [a for a in hint.__args__ if a is not type(None)]  # noqa: E721
         if len(members) == 1:
             return _coerce(members[0], native)
-        # list[X]
-        list_origin = getattr(hint, "__origin__", None)
-        if list_origin in (list, tuple) and members:
-            return [_coerce(members[0], v) for v in native]
         return native
-    list_origin = getattr(hint, "__origin__", None)
-    if list_origin in (list, tuple):
-        (elem,) = hint.__args__
-        return [_coerce(elem, v) for v in native]
     if isinstance(hint, type) and issubclass(hint, Enum):
         return hint[native]                          # member name -> enum
     if isinstance(hint, type) and is_dataclass(hint):
