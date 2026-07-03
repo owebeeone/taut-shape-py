@@ -1,0 +1,58 @@
+# Distribution name is `taut-shape` (pip install taut-shape -> import taut_shape).
+# Pure Python: no Rust/PyO3, no maturin, no native extension (InitialPlan §0).
+[project]
+name = "taut-shape"
+dynamic = ["version"]
+description = "taut-shape — pure-Python delivery-shape engine (`log` first): a clean-room mailbox LogNode gated by the taut-shape behavioral oracle (import: `taut_shape`)"
+readme = "README.md"
+requires-python = ">=3.10"   # structural `match` is load-bearing (InitialPlan §7.1)
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Gianni Mariani", email = "gianni@mariani.ws" }]
+keywords = ["taut", "log", "delivery-shape", "mailbox", "streaming", "oracle"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Networking",
+]
+# Runtime dep on taut's pure-Python codec (taut.wire.cbor/codec/jsoncodec).
+# PyPI dist name is `taut-proto`; import name is `taut`. The exact pin is a
+# packaging detail (see tests/oracle/SOURCE.md); tests use PYTHONPATH to the
+# workspace `taut/src` and do not resolve this from an index.
+dependencies = ["taut-proto"]
+
+[project.urls]
+Homepage = "https://github.com/owebeeone/taut-shape-py"
+Repository = "https://github.com/owebeeone/taut-shape-py"
+
+[project.scripts]
+taut-shape-tool = "taut_shape.tool:main"   # Phase 4 (not built yet)
+
+[project.optional-dependencies]
+dev = ["pytest", "syrupy", "ruff", "mypy"]
+
+[build-system]
+requires = ["setuptools>=77", "setuptools-scm>=8"]   # version from git tags
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+tag_regex = "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+fallback_version = "0.0.0"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["taut_shape*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true

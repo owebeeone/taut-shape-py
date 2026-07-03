@@ -414,11 +414,30 @@ class StopReason(Enum):
 class ProducerStop:                    # D6: an OUTPUT message, not a callback
     reason: StopReason
 
+class Severity(Enum):                  # D18: v0 emits only WARN
+    WARN = "warn"
+    ERROR = "error"
+
+class DiagCode(Enum):                  # D18: machine-readable, no free-text companion
+    PUSH_AFTER_TERMINAL = "push_after_terminal"   # D19: Push after Seal/Close
+
+@dataclass(frozen=True, slots=True)
+class Diagnostic:                      # D18: LogDiagnostic — an OUTPUT message, code only
+    severity: Severity
+    code: DiagCode
+
 
 # Hand-written (D17): the closed unions over the generated types.
 InMsg = Push | Seal | Close | Read | EndStream | TimerExpired | Evict
-OutMsg = Response | SetTimer | CancelTimer | ProducerStop
+OutMsg = Response | SetTimer | CancelTimer | ProducerStop | Diagnostic
 ```
+
+`Diagnostic` is unaddressed and needs no waiter: the shell routes it to the
+host's logging idiomatically — the `logging` module (e.g. `logger.warning`),
+or an injected sink — **never inside the engine**, which is sans-io (D18). v0's
+only case is a `Push` after `Seal`/`Close`, dropped and warned with
+`DiagCode.PUSH_AFTER_TERMINAL` (D19); code-only keeps the oracle byte-stable
+across languages.
 
 **Rationale for the message idiom.** One frozen slotted dataclass per message
 (the tautc generator's Python output shape, D17) + a hand-written PEP 604
