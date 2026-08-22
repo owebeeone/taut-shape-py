@@ -18,6 +18,7 @@ from taut_shape.log import (
     LogProducerStop,
     LogPush,
     LogReadRequest,
+    LogReadResponse,
     LogSeal,
     LogState,
     LogStopReason,
@@ -92,3 +93,25 @@ def test_explicit_only_never_stops_on_reader_loss() -> None:
     node = LogNode(stop_when=StopWhen.EXPLICIT_ONLY)
     node.handle(_read("s1", 0, timeout_ms=0))
     assert node.handle(LogEndStream(log_id="log-A", stream_id="s1")) == []
+
+
+def test_one_push_releases_large_held_set_once_in_creation_order() -> None:
+    node = LogNode()
+    held_count = 1024
+    for i in range(held_count):
+        assert node.handle(_read(f"s-{i}", 0)) == []
+
+    out = node.handle(LogPush(payload=b"a"))
+    assert len(out) == held_count
+    assert all(isinstance(msg, LogReadResponse) for msg in out)
+    assert [msg.stream_id for msg in out if isinstance(msg, LogReadResponse)] == [
+        f"s-{i}" for i in range(held_count)
+    ]
+    assert all(
+        msg.state is LogState.data and msg.next_cursor.seq == 1
+        for msg in out
+        if isinstance(msg, LogReadResponse)
+    )
+
+    # The batch clear removed every parked read; a later push emits nothing.
+    assert node.handle(LogPush(payload=b"b")) == []

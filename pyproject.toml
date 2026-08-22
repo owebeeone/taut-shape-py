@@ -29,7 +29,7 @@ Homepage = "https://github.com/owebeeone/taut-shape-py"
 Repository = "https://github.com/owebeeone/taut-shape-py"
 
 [project.scripts]
-taut-shape-tool = "taut_shape.tool:main"   # Phase 4 (not built yet)
+taut-shape-tool = "taut_shape.tool:main"   # Phase 4 CLI; built, see README Status
 
 [project.optional-dependencies]
 dev = ["pytest", "syrupy", "ruff", "mypy"]
@@ -39,8 +39,11 @@ requires = ["setuptools>=77", "setuptools-scm>=8"]   # version from git tags
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-tag_regex = "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
 fallback_version = "0.0.0"
+
+[tool.setuptools_scm.tag]
+prefix = "v"
+strict = true
 
 [tool.setuptools.packages.find]
 where = ["src"]

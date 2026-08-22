@@ -12,7 +12,7 @@ three parts, back to back::
 * **length** — a little-endian ``u32`` byte count of everything after the length
   prefix: the 1 tag byte **plus** the CBOR body. Body length is ``length - 1``;
   total wire size is ``4 + length``.
-* **tag** — the ``LogMsgType`` wire value as a single byte (0..=11).
+* **tag** — the selected shape's message-type wire value as a single byte.
 * **body** — the message's deterministic-CBOR encoding (taut ``codec.encode``).
 
 Truncated tail (a partial frame at EOF) is tolerated: a short read while reading
@@ -37,6 +37,18 @@ _TAG_TO_DISC: dict[int, str] = {m.value: m.name for m in g.LogMsgType}
 
 class FrameError(Exception):
     """A frame was fully present on the wire but malformed."""
+
+    code = "TAUT_SHAPE_MALFORMED_MESSAGE"
+
+
+class UnknownMessageTagError(FrameError):
+    """A complete frame used no tag in the selected shape's registry."""
+
+    code = "TAUT_SHAPE_UNKNOWN_TAG"
+
+    def __init__(self, tag: int) -> None:
+        super().__init__(f"unknown frame tag byte {tag}")
+        self.tag = tag
 
 
 @dataclass(slots=True)
@@ -78,8 +90,6 @@ def read_frame(r: BinaryIO) -> Frame | None:
         return None                # truncated tail
     tag_byte = frame_buf[0]
     body = frame_buf[1:]
-    if tag_byte not in _TAG_TO_DISC:
-        raise FrameError(f"unknown frame tag byte {tag_byte}")
     return Frame(tag=tag_byte, body=bytes(body))
 
 
@@ -98,7 +108,10 @@ def decode_message(frame: Frame) -> object:
 
     Raises :class:`FrameError` on an undecodable body.
     """
-    disc = _TAG_TO_DISC[frame.tag]
+    try:
+        disc = _TAG_TO_DISC[frame.tag]
+    except KeyError as error:
+        raise UnknownMessageTagError(frame.tag) from error
     name, cls = oraclefmt._BY_TYPE[disc]
     try:
         native = codec.decode(oraclefmt._SCHEMA, name, frame.body)

@@ -38,5 +38,8 @@ this repo (`../taut-shape/corpus/log.v0.json`), overridable via the
 
 ## Tool protocol (Phase 4)
 
-Framing + JSONL schema + channel/fd assignment: not pinned yet — Phase 4 is not
-built in this milestone.
+Built: `src/taut_shape/tool/main.py` implements the `node`/`client` CLI over the
+stdin/stdout framing in `src/taut_shape/tool/framing.py` (byte-for-byte
+identical to the Rust reference), and `taut-shape/matrix/driver.py` runs it as
+the `py` language (Phase 5). See the package README's Status section for the
+current capability table.

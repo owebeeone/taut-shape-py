@@ -160,10 +160,9 @@ class LogNode:
         out: list[OutMsg] = []
         # A new Read supersedes a held one (D5): drop it unanswered, cancel its
         # timer.
-        if sess.held is not None and sess.timer_token is not None:
-            out.append(LogCancelTimer(token=sess.timer_token))
-        sess.held = None
-        sess.timer_token = None
+        prev_token = self._sessions.clear_held(sess)
+        if prev_token is not None:
+            out.append(LogCancelTimer(token=prev_token))
 
         resolved = self._resolve_read(sess, req)
         if resolved is not None:
@@ -177,11 +176,11 @@ class LogNode:
             out.append(self._would_block(sess, req))
             return out
         # Hold the read (absent timeout ⇒ indefinite; >0 ⇒ hold + timer).
-        sess.held = req
+        token: int | None = None
         if timeout is not None and timeout > 0:
             token = self._alloc_token()
-            sess.timer_token = token
             out.append(LogSetTimer(token=token, ms=timeout))
+        self._sessions.set_held(sess, req, token)
         return out
 
     def _on_end_stream(self, msg: LogEndStream) -> list[OutMsg]:
@@ -197,12 +196,12 @@ class LogNode:
         return out
 
     def _on_timer_expired(self, msg: LogTimerExpired) -> list[OutMsg]:
+        # 56-F6: find_by_timer is O(1) via the timer index, not an O(S) scan.
         sess = self._sessions.find_by_timer(msg.token)
         if sess is None or sess.held is None:
             return []                    # late/canceled tokens are no-ops (D14)
         held = sess.held
-        sess.held = None
-        sess.timer_token = None
+        self._sessions.clear_held(sess)
         return [self._would_block(sess, held)]
 
     # ---- read resolution helpers --------------------------------------------
@@ -291,17 +290,24 @@ class LogNode:
     def _release_held_reads(self) -> list[OutMsg]:
         """Answer every held read that can now resolve, in stream-creation
         order (D16). A push/seal/close changed the window or lifecycle; re-run
-        resolution for each held session."""
+        resolution for each held session. 56-F6: held_in_creation_order() is
+        O(H), not O(S) / O(S + H log H)."""
         out: list[OutMsg] = []
+        resolved_reads: list[tuple[_Session, LogReadResponse]] = []
         for sess in self._sessions.held_in_creation_order():
             assert sess.held is not None
             resolved = self._resolve_read(sess, sess.held)
             if resolved is not None:
-                if sess.timer_token is not None:
-                    out.append(LogCancelTimer(token=sess.timer_token))
-                sess.held = None
-                sess.timer_token = None
-                out.append(resolved)
+                resolved_reads.append((sess, resolved))
+        # Clear the answerable subset in one linear batch. Repeated removal
+        # from the sorted rank list made a full H-reader wake O(H²).
+        tokens = self._sessions.clear_held_many(
+            [sess for sess, _ in resolved_reads]
+        )
+        for token, (_, resolved) in zip(tokens, resolved_reads, strict=True):
+            if token is not None:
+                out.append(LogCancelTimer(token=token))
+            out.append(resolved)
         return out
 
     def _maybe_last_reader_stop(self, had_readers: int) -> list[OutMsg]:

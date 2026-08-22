@@ -32,12 +32,17 @@ class Lifecycle(Enum):
 class _Window:
     """The append-only record window + lifecycle flags. Pure, no I/O."""
 
-    __slots__ = ("_records", "_head", "_floor", "lifecycle", "error")
+    __slots__ = ("_records", "_start", "_head", "_floor", "lifecycle", "error")
 
     def __init__(self) -> None:
-        # _records is dense; index 0 holds seq=_floor. We keep it simple: a list
-        # of LogRecord in seq order, with _floor tracking the earliest retained.
+        # _records is dense; _records[_start] holds seq=_floor (once non-empty).
+        # 56-F5: `_start` is a logical index of the first retained record —
+        # eviction advances it instead of `del self._records[:drop]` (O(N) per
+        # call, making N incremental evictions O(N^2)); the dead prefix is
+        # reclaimed by an occasional compaction (amortized O(1) per evicted
+        # record) once it reaches half the backing list.
         self._records: list[LogRecord] = []
+        self._start: int = 0           # logical index of the first retained record
         self._head: int = 0            # last assigned seq (0 = empty), D8
         self._floor: int = 1           # earliest retained seq (1 before eviction)
         self.lifecycle: Lifecycle = Lifecycle.LIVE
@@ -80,22 +85,27 @@ class _Window:
         window). The new floor is the lowest retained seq — ``up_to_seq + 1``,
         but clamped to ``head + 1`` so eviction never claims to drop beyond head
         (matches the reference: ``next_cursor = floor - 1`` stays ``<= head`` on
-        evict-past-head, D7/D9)."""
+        evict-past-head, D7/D9).
+
+        56-F5: advances the logical ``_start`` index instead of
+        ``del self._records[:drop]`` on every call (O(N) per call, making N
+        incremental evictions O(N^2)). The dead prefix ``[0, _start)`` is
+        reclaimed by a single ``del`` only once it reaches half the backing
+        list, so the amortized cost per evicted record stays O(1)."""
         if up_to_seq < self._floor - 1:
             return
         evicted_through = min(up_to_seq, self._head)
         new_floor = evicted_through + 1
-        # drop from the front while seq <= up_to_seq
-        drop = 0
-        for rec in self._records:
-            if rec.seq <= up_to_seq:
-                drop += 1
-            else:
-                break
-        if drop:
-            del self._records[:drop]
+        n = len(self._records)
+        i = self._start
+        while i < n and self._records[i].seq <= up_to_seq:
+            i += 1
+        self._start = i
         if new_floor > self._floor:
             self._floor = new_floor
+        if self._start > 0 and self._start * 2 >= len(self._records):
+            del self._records[: self._start]
+            self._start = 0
 
     def seal(self) -> None:
         if self.lifecycle is Lifecycle.LIVE:
@@ -123,12 +133,24 @@ class _Window:
         """Records with ``seq > from_seq``, bounded by ``max_records`` and
         ``max_bytes`` (raw payload bytes only). Forward progress (D10): if any
         record is available, return at least one even if it alone exceeds
-        ``max_bytes``."""
+        ``max_bytes``.
+
+        56-F5: ``_records[_start + i].seq == front.seq + i`` (dense-sequence
+        invariant: ``append`` only assigns the next seq, ``evict`` only
+        advances ``_start``), so the first candidate index is computed
+        directly from the front record's seq instead of scanning from the
+        front and skipping already-consumed records. A read is O(K) for K
+        returned records rather than O(N) in the retained window size."""
         out: list[LogRecord] = []
+        n = len(self._records)
+        if self._start >= n:
+            return tuple(out)
+        front_seq = self._records[self._start].seq
+        offset = from_seq - front_seq + 1 if from_seq >= front_seq else 0
+        start = self._start + offset
         used_bytes = 0
-        for rec in self._records:
-            if rec.seq <= from_seq:
-                continue
+        for i in range(start, n):
+            rec = self._records[i]
             if max_records is not None and len(out) >= max_records:
                 break
             rec_bytes = len(rec.payload)

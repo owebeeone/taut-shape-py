@@ -72,9 +72,11 @@ def test_read_frame_clean_eof() -> None:
 
 
 def test_read_frame_unknown_tag() -> None:
-    bad = bytes([1, 0, 0, 0, 99])                 # len=1, tag byte 99 (unknown)
-    with pytest.raises(framing.FrameError):
-        framing.read_frame(io.BytesIO(bad))
+    raw = bytes([2, 0, 0, 0, 99, 0xA0])
+    frame = framing.read_frame(io.BytesIO(raw))
+    assert frame is not None and frame.tag == 99
+    with pytest.raises(framing.UnknownMessageTagError):
+        framing.decode_message(frame)
 
 
 # ── in-process node pump ─────────────────────────────────────────────────────
@@ -93,7 +95,7 @@ def test_node_pump_push_then_read() -> None:
     )
     inp.seek(0)
     out = io.BytesIO()
-    code = tool_main.run_node([], inp, out, sys.stderr)
+    code = tool_main.run_node(["--shape", "log"], inp, out, sys.stderr)
     assert code == 0
     out.seek(0)
     frame = framing.read_frame(out)
@@ -141,11 +143,11 @@ def test_selfpair_push_seal_drain(tmp_path: Path) -> None:
     script_path.write_text(json.dumps(script))
 
     node = _spawn(
-        ["node", "--stop-when", "last_reader", "--script", str(script_path)],
+        ["node", "--shape", "log", "--stop-when", "last_reader", "--script", str(script_path)],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
     client = _spawn(
-        ["client", "--stream-id", "s1", "--from", "0"],
+        ["client", "--shape", "log", "--stream-id", "s1", "--from", "0"],
         stdin=node.stdout, stdout=node.stdin, stderr=subprocess.PIPE,
     )
     # Parent doesn't need the crossed ends now that both children hold them.
