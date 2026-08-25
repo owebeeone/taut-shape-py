@@ -19,10 +19,10 @@ classifiers = [
     "Topic :: System :: Networking",
 ]
 # Runtime dep on taut's pure-Python codec (taut.wire.cbor/codec/jsoncodec).
-# PyPI dist name is `taut-proto`; import name is `taut`. The exact pin is a
-# packaging detail (see tests/oracle/SOURCE.md); tests use PYTHONPATH to the
-# workspace `taut/src` and do not resolve this from an index.
-dependencies = ["taut-proto"]
+# PyPI dist name is `taut-proto`; import name is `taut`. Taut releases share
+# major/minor coordinates while allowing independent patch releases. Tests use
+# PYTHONPATH to the workspace `taut/src` and do not resolve this from an index.
+dependencies = ["taut-proto>=0.9.0,<0.10"]
 
 [project.urls]
 Homepage = "https://github.com/owebeeone/taut-shape-py"
@@ -39,7 +39,7 @@ requires = ["setuptools>=77", "setuptools-scm>=8"]   # version from git tags
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-fallback_version = "0.0.0"
+fallback_version = "0.9.0"
 
 [tool.setuptools_scm.tag]
 prefix = "v"
