@@ -22,7 +22,7 @@ classifiers = [
 # PyPI dist name is `taut-proto`; import name is `taut`. Taut releases share
 # major/minor coordinates while allowing independent patch releases. Tests use
 # PYTHONPATH to the workspace `taut/src` and do not resolve this from an index.
-dependencies = ["taut-proto>=0.9.0,<0.10"]
+dependencies = ["taut-proto>=0.9.1,<0.10"]
 
 [project.urls]
 Homepage = "https://github.com/owebeeone/taut-shape-py"
