@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, BinaryIO, cast
 
-from taut.ir.load import load_schema
 from taut.wire import codec, jsoncodec
 
+from .._schema import load_packaged_schema
 from ..tool import framing
 from . import _generated as g
 from .engine import StreamInput, StreamOutput
 
-_SCHEMA_PATH = Path(__file__).parents[4] / "taut-shape" / "ir" / "shape_stream.taut.py"
-_SCHEMA = load_schema(_SCHEMA_PATH)
+_SCHEMA = load_packaged_schema("stream")
 _TYPE_TO_MESSAGE = {
     "push": "StreamPush",
     "seal": "StreamSeal",

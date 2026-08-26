@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, BinaryIO
 
-from taut.ir.load import load_schema
 from taut.wire import codec, jsoncodec
 
+from .._schema import load_packaged_schema
+from ..tool import framing
 from . import _generated as g
 from .engine import ValueInput, ValueOutput
-from ..tool import framing
 
-
-_SCHEMA_PATH = Path(__file__).parents[4] / "taut-shape" / "ir" / "shape_value.taut.py"
-_SCHEMA = load_schema(_SCHEMA_PATH)
+_SCHEMA = load_packaged_schema("value")
 _TYPE_TO_MESSAGE = {
     "set": "ValueSet",
     "read": "ValueReadRequest",

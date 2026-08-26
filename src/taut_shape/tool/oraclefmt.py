@@ -28,6 +28,7 @@ from typing import Any
 from taut.ir.load import load_schema
 from taut.wire import jsoncodec
 
+from .._schema import load_packaged_schema
 from ..log import _generated as g
 
 # type discriminator (LogMsgType member) -> (schema message name, dataclass)
@@ -51,17 +52,14 @@ _BY_CLASS: dict[type, tuple[str, str]] = {
 }
 
 
-def _default_schema_path() -> Path:
+def _load_log_schema() -> Any:
     override = os.environ.get("TAUT_SHAPE_SCHEMA")
     if override:
-        return Path(override)
-    # sibling taut-shape repo: taut-shape-py/.. -> taut-shape/ir/shape_log.taut.py
-    here = Path(__file__).resolve()
-    repo_root = here.parents[3]                      # .../taut-shape-py
-    return repo_root.parent / "taut-shape" / "ir" / "shape_log.taut.py"
+        return load_schema(Path(override))
+    return load_packaged_schema("log")
 
 
-_SCHEMA = load_schema(_default_schema_path())
+_SCHEMA = _load_log_schema()
 
 
 # ---- native-dict (jsoncodec form) <-> dataclass -----------------------------
@@ -104,11 +102,11 @@ def _coerce(hint: Any, native: Any) -> Any:
     # list[X] / tuple[X] first — a single type arg here is the element type,
     # not an Optional member (Optional[list[X]] resolves to the list here too).
     if list_origin in (list, tuple):
-        (elem,) = [a for a in hint.__args__ if a is not type(None)]  # noqa: E721
+        (elem,) = [a for a in hint.__args__ if a is not type(None)]
         return [_coerce(elem, v) for v in native]
     # optional/union: pick the non-None member
     if origin is not None:
-        members = [a for a in hint.__args__ if a is not type(None)]  # noqa: E721
+        members = [a for a in hint.__args__ if a is not type(None)]
         if len(members) == 1:
             return _coerce(members[0], native)
         return native

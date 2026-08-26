@@ -40,6 +40,13 @@ class TextAdapter:
         return []
 
 
+def test_cli_help_exits_successfully(capsys: pytest.CaptureFixture[str]) -> None:
+    assert tool_main.main(["--help"]) == 0
+    captured = capsys.readouterr()
+    assert "USAGE:" in captured.out
+    assert captured.err == ""
+
+
 def test_runtime_contract_is_shape_neutral() -> None:
     emissions = EngineRuntime(TextAdapter()).process("abcd")
     assert [(e.output, e.effect.frame) for e in emissions] == [(True, "even")]

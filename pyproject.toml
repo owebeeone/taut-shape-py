@@ -39,7 +39,7 @@ requires = ["setuptools>=77", "setuptools-scm>=8"]   # version from git tags
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-fallback_version = "0.9.0"
+fallback_version = "0.9.1"
 
 [tool.setuptools_scm.tag]
 prefix = "v"
@@ -48,6 +48,9 @@ strict = true
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["taut_shape*"]
+
+[tool.setuptools.package-data]
+taut_shape = ["schemas/*.taut.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

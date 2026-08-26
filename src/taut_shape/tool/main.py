@@ -965,6 +965,9 @@ def _run_crdt_client(
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
+    if args in (["-h"], ["--help"]):
+        sys.stdout.write(_USAGE)
+        return 0
     if not args:
         sys.stderr.write(_USAGE)
         return 2
