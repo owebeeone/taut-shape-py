@@ -1,0 +1,32 @@
+# taut-shape-py's releases (RELEASE.md). gearu verifies the tree, tags it and pushes the tag, and
+# the GitHub Release it creates starts .github/workflows/publish.yml, which publishes taut-shape to
+# PyPI. The version comes from the tag (setuptools-scm).
+[project]
+name = "taut-shape-py"
+branch = "main"
+remote = "origin"
+tag_prefix = "v"
+github_repo = "owebeeone/taut-shape-py"
+
+[python]
+manifest = "pyproject.toml"
+version = "scm"
+
+[release]
+# The tests run against the package installed with its dependencies, so against the taut-proto
+# its pin allows, from PyPI. The build is told the version, since the tag does not exist yet.
+checks = [
+    # The package reads the contract's corpus from a sibling taut-shape checkout, as CI does, which
+    # checks the contract's main out beside it: link gearu's candidate to this checkout's sibling.
+    ["ln", "-sfn", "{repo}/../taut-shape", "../taut-shape"],
+    ["uv", "run", "--no-project", "--python", "3.13", "--with", ".[dev]",
+     "python", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
+    ["env", "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TAUT_SHAPE={python_version}",
+     "uv", "build", "--python", "3.13"],
+]
+# A tag-derived version needs no release commit, so gearu tags its candidate: rebuilding it is enough.
+exact_checks = [
+    ["env", "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TAUT_SHAPE={python_version}",
+     "uv", "build", "--python", "3.13"],
+]
+github_notes = "Taut shape package for Python, {tag}. Publishing this release triggers the PyPI workflow."
