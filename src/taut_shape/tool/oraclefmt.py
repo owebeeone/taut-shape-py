@@ -25,7 +25,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from taut.ir.load import load_schema
 from taut.wire import jsoncodec
 
 from .._schema import load_packaged_schema
@@ -55,6 +54,7 @@ _BY_CLASS: dict[type, tuple[str, str]] = {
 def _load_log_schema() -> Any:
     override = os.environ.get("TAUT_SHAPE_SCHEMA")
     if override:
+        from taut.ir.load import load_schema  # explicit development override only
         return load_schema(Path(override))
     return load_packaged_schema("log")
 
